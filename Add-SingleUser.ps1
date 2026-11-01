@@ -5,7 +5,7 @@
     Takes external command parameters to safely onboard an individual employee, dynamically 
     checking for pre-existing Employee IDs and resolving naming collisions.
 .NOTES
-    Author: [Your Name]
+    Author: Fadheel Ahmed Shah
 #>
 
 # 1. ENTERPRISE PARAMETER INTERFACE (Now including mandatory Employee ID)
