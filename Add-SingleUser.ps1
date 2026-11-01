@@ -6,6 +6,7 @@
     checking for pre-existing Employee IDs and resolving naming collisions.
 .NOTES
     Author: Fadheel Ahmed Shah
+    Test Environment: VM Server 2022 created in Oracle VB
 #>
 
 # 1. ENTERPRISE PARAMETER INTERFACE (Now including mandatory Employee ID)
