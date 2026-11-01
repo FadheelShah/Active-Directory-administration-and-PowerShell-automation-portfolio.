@@ -5,7 +5,7 @@
     Processes HR roster records, matching them against Active Directory using 
     unique Employee ID numbers to prevent duplicate profile creation.
 .NOTES
-    Author: [Your Name]
+    Author: Fadheel Ahmed Shah
 #>
 
 # Explicitly ensure the native Active Directory module is loaded
