@@ -20,7 +20,7 @@ Designed for large-scale operations (e.g., corporate mergers, batch graduate hir
 *   **Transactional Logging Ledger:** Pipelines execution states (`SUCCESS`, `SKIPPED`, `FAILED`) dynamically to a centralized, local text ledger using native PowerShell 5.1 compatibility standards (`-Encoding utf8`).
 
 #### 📸 Automation Engine Execution
-![Batch Script Execution](images/Batch_Sript_Execution.png)
+![Batch Script Execution](images/Batch_Script_Execution.png)
 
 ### 2. Daily Administrative Parameter Utility (`Add-SingleUser.ps1`)
 A locked-down, parameter-driven command-line tool built for Tier 1 Helpdesk technicians to handle ad-hoc user creations without touching or exposing the core script logic.
