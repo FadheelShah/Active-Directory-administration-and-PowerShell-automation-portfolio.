@@ -6,6 +6,7 @@
     unique Employee ID numbers to prevent duplicate profile creation.
 .NOTES
     Author: Fadheel Ahmed Shah
+    Test Environment: VM Server 2022 created in Oracle VB
 #>
 
 # Explicitly ensure the native Active Directory module is loaded
