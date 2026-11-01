@@ -1,0 +1,9 @@
+# Generated Active Directory audit logs
+ProvisioningAuditLog.csv
+
+# Temporary files
+*.tmp
+*.log
+
+# PowerShell history
+ConsoleHost_history.txt

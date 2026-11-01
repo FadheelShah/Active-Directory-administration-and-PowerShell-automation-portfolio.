@@ -19,7 +19,7 @@ EmployeeID,FirstName,LastName,Department,Title
 EMP-1001,Fadheel,Ahmed,IT,SysAdmin
 EMP-1002,Peter,Pet,Finance,Accountant
 EMP-1003,Jane,Doe,Operations,Manager
-EMP-1004,Fadheel,Ahmed,IT,SysAdmin
+EMP-1006,Luke,Star,IT,SysAdmin
 "@
 
 # Initialize Log Ledger if it doesn't exist
