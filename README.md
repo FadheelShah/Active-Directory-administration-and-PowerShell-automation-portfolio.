@@ -19,6 +19,9 @@ Designed for large-scale operations (e.g., corporate mergers, batch graduate hir
 *   **Automated Verification Loop:** If a username format matches an existing account but belongs to a *different* individual, the loop automatically appends an ascending numerical string until a clean slot is cleared.
 *   **Transactional Logging Ledger:** Pipelines execution states (`SUCCESS`, `SKIPPED`, `FAILED`) dynamically to a centralized, local text ledger using native PowerShell 5.1 compatibility standards (`-Encoding utf8`).
 
+#### 📸 Automation Engine Execution
+![Batch Script Execution](images/Batch_Sript_Execution.png)
+
 ### 2. Daily Administrative Parameter Utility (`Add-SingleUser.ps1`)
 A locked-down, parameter-driven command-line tool built for Tier 1 Helpdesk technicians to handle ad-hoc user creations without touching or exposing the core script logic.
 *   **Command Interface encapsulation:** Uses a structured `param()` block enforcing mandatory fields (`-EmployeeID`, `-FirstName`, `-LastName`, `-Department`, `-Title`).
@@ -29,6 +32,9 @@ Engineered custom graphical view modifications using **ADSI Edit (`adsiedit.msc`
 *   **Schema Extension Partitioning:** Connected directly to the `Configuration` naming context database partition.
 *   **Display Specifier Hardening:** Modified the English locale specifier (`CN=409 -> CN=default-Display -> extraColumns`) to bind the `employeeID` property globally.
 *   **Console Enhancement:** Unlocked the ability to add `Employee ID` as a selectable, live-updating column header directly within Saved Queries and folder views inside the Active Directory Users and Computers (ADUC) application window.
+
+#### 📸 ADUC Console Optimization View
+![ADUC Custom Column View](images/Custom_EmployeeID_Column.png)
 
 ---
 
@@ -42,7 +48,7 @@ Engineered custom graphical view modifications using **ADSI Edit (`adsiedit.msc`
 
 1.  **Clone the portfolio codebase into your lab environment:**
     ```powershell
-    git clone https://github.com/YOUR_USERNAME/ad-identity-provisioner.git
+    git clone https://github.com
     cd ad-identity-provisioner
     ```
 
