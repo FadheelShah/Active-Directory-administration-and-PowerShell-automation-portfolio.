@@ -18,19 +18,21 @@ The project focuses on automating repetitive IT administration tasks, improving 
 ## Project Structure
 
 ```text
-ad_identity_provisioner/
+AD-Projects/
 │
 ├── User-Creation/
 │   ├── Add-SingleUser.ps1
-│   ├── Deploy-Users.ps1
-│   └── README.md
+│   └── Deploy-Users.ps1
 │
 ├── Password-Management/
-│   └── README.md
+│   └── (Scripts to be added)
 │
 ├── Documentation/
 │
 ├── images/
+│   ├── .gitkeep
+│   ├── Batch_Script_Execution.png
+│   └── Custom_EmployeeID_Column.png
 │
 ├── .gitignore
 └── README.md
