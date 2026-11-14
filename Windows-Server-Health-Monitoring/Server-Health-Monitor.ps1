@@ -119,6 +119,7 @@ $memoryStatus = Get-ThresholdStatus $memoryPercent $MemoryWarningPercent
 # Fixed local volumes: check capacity; no files are created or deleted on drives.
 $diskCards = @()
 $diskStatuses = @()
+$diskdata =@()
 try {
     $disks = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType=3')
     if ($disks.Count -eq 0) { throw 'No fixed disks returned.' }
@@ -131,6 +132,13 @@ try {
         }
         $status = Get-ThresholdStatus $pct $DiskWarningPercent
         $diskStatuses += $status
+        $diskData += [PSCustomObject]@{
+            Drive       = $disk.DeviceID
+            UsedPercent = $pct
+            TotalGB     = [math]::Round($disk.Size / 1GB, 2)
+            FreeGB      = [math]::Round($disk.FreeSpace / 1GB, 2)
+            Status      = $status
+        }
         $display = if ($null -eq $pct) { 'N/A' } else { "$pct%" }
         $diskCards += New-MetricCard "Disk $($disk.DeviceID)" $display $status $detail
     }
@@ -159,6 +167,8 @@ catch { $uptimeDetail = $_.Exception.Message }
 $serviceNames = @('NTDS','DNS','W3SVC')
 $serviceRows = @()
 $serviceStatuses = @()
+$serviceData = @()
+
 foreach ($serviceName in $serviceNames) {
     try {
         $service = Get-Service -Name $serviceName -ErrorAction Stop
@@ -170,6 +180,12 @@ foreach ($serviceName in $serviceNames) {
         $status = 'UNKNOWN'
     }
     $serviceStatuses += $status
+    $serviceData += [PSCustomObject]@{
+        Name   = $serviceName
+        State  = $state
+        Status = $status
+    }
+
     $serviceRows += '<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>' -f (ConvertTo-HtmlText $serviceName),(ConvertTo-HtmlText $state),(New-StatusHtml $status)
 }
 
@@ -230,6 +246,107 @@ foreach ($token in $tokens.Keys) { $html = $html.Replace($token,[string]$tokens[
 $reportFile = 'Server-Health-{0}.html' -f $fijiFinished.ToString('yyyy-MM-dd-HH-mm-ss')
 $reportPath = Join-Path $reportsPath $reportFile
 [System.IO.File]::WriteAllText($reportPath,$html,[System.Text.UTF8Encoding]::new($false))
+
+# ------------------------------------------------------------
+# JSON export for the Unified Monitoring Dashboard
+# ------------------------------------------------------------
+
+# Create the data directories if they do not exist.
+$dataPath = Join-Path $PSScriptRoot 'Data'
+$historyPath = Join-Path $dataPath 'History'
+
+foreach ($folder in @($dataPath, $historyPath)) {
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) {
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+    }
+}
+
+# Convert the event count to a number when available.
+$eventCount = $null
+
+if ($eventCountText -match '^\d+$') {
+    $eventCount = [int]$eventCountText
+}
+
+# Create one structured object from the collected measurements.
+$healthData = [PSCustomObject]@{
+    SchemaVersion = 1
+    Hostname      = $computer.Name
+    CollectedAtUtc = [DateTime]::UtcNow.ToString('o')
+    OverallStatus = $overallStatus
+
+    CPU = [PSCustomObject]@{
+        AveragePercent = $cpuAverage
+        PeakPercent    = $cpuPeak
+        Status         = $cpuStatus
+    }
+
+    Memory = [PSCustomObject]@{
+        UsedPercent = $memoryPercent
+        Status      = $memoryStatus
+    }
+
+    Disks = @($diskData)
+
+    Services = @($serviceData)
+
+    Uptime = [PSCustomObject]@{
+        Display = $uptimeText
+        Status  = $uptimeStatus
+    }
+
+    SystemEvents = [PSCustomObject]@{
+        Count         = $eventCount
+        LookbackHours = $EventLookbackHours
+        Status        = $eventStatus
+    }
+
+    ReportFile = $reportFile
+}
+
+# Convert the PowerShell object into formatted JSON.
+$json = $healthData | ConvertTo-Json -Depth 6
+
+# Save historical JSON data.
+$historyFile = 'Server-Health-{0}.json' -f $fijiFinished.ToString('yyyy-MM-dd-HH-mm-ss')
+$historyFilePath = Join-Path $historyPath $historyFile
+
+# UTF-8 without BOM.
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+[System.IO.File]::WriteAllText($historyFilePath, $json, $utf8)
+
+# Write latest.json through a temporary file first.
+$latestPath = Join-Path $dataPath 'latest.json'
+$tempPath = Join-Path $dataPath ('latest-{0}.tmp' -f [guid]::NewGuid().ToString('N'))
+
+try {
+    [System.IO.File]::WriteAllText($tempPath, $json, $utf8)
+
+    if (Test-Path -LiteralPath $latestPath) {
+    $backupPath = Join-Path $dataPath 'latest-backup.tmp'
+
+    [System.IO.File]::Replace(
+        $tempPath,
+        $latestPath,
+        $backupPath
+    )
+
+    Remove-Item -LiteralPath $backupPath -Force
+    }
+    else {
+        [System.IO.File]::Move($tempPath, $latestPath)
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $tempPath) {
+        Remove-Item -LiteralPath $tempPath -Force
+    }
+}
+
+Write-Host "JSON data saved to: $latestPath"
+Write-Host "JSON history saved to: $historyFilePath"
+
 Write-Host ('Overall: {0} | CPU: {1} | Memory: {2}' -f $overallStatus,$cpuText,$memText)
 Write-Host ('Elapsed: {0} seconds | Report: {1}' -f $durationSeconds,$reportPath)
 if (-not $NoBrowser) { Start-Process -FilePath $reportPath }
