@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows Server Health Report</title>
+<style>
+/* Dashboard presentation is maintained here, separate from PowerShell. */
+:root { font-family: Segoe UI, Arial, sans-serif; color: #172338; background: #f3f6fa; }
+body { margin: 0; padding: 28px; }
+main { max-width: 1080px; margin: auto; }
+h1 { margin-bottom: 6px; }
+.meta, .footnote { color: #53657d; font-size: 14px; line-height: 1.6; }
+.summary { background: white; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px; margin: 20px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 16px; }
+.card { background: white; border: 1px solid #d9e2ec; border-radius: 12px; padding: 22px; }
+.card h2 { font-size: 18px; margin: 0 0 12px; }
+.value { font-size: 32px; font-weight: 700; margin: 10px 0; }
+.details { color: #53657d; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.status { font-weight: 700; }
+.HEALTHY { color: #147447; }
+.WARNING { color: #a55a00; }
+.CRITICAL { color: #b42318; }
+.UNKNOWN { color: #53657d; }
+.table-panel { background: white; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px; margin-top: 18px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e8edf3; }
+@media print { body { background: white; padding: 0; } .card, .summary, .table-panel { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Windows Server Health Report</h1>
+<p class="meta">Server: WIN-0691ML0QM2Q | Generated: 2026-11-14 18:07:37 Fiji (UTC+12)</p>
+<div class="summary"><strong>Overall status:</strong> <span class="status HEALTHY">HEALTHY</span></div>
+<div class="grid"><section class="card"><h2>CPU Average</h2><div class="value">34.1%</div><span class="status HEALTHY">HEALTHY</span><p class="details">5 samples at 2-second intervals; peak 35.2%; warning at 85%</p></section>
+<section class="card"><h2>Memory Used</h2><div class="value">49.9%</div><span class="status HEALTHY">HEALTHY</span><p class="details">Used 1.99 GB of 4 GB; available 2.01 GB; warning at 85%</p></section>
+<section class="card"><h2>Disk C:</h2><div class="value">14.5%</div><span class="status HEALTHY">HEALTHY</span><p class="details">Free 84.94 GB of 99.39 GB; warning at 85%</p></section>
+<section class="card"><h2>Disk E:</h2><div class="value">0.4%</div><span class="status HEALTHY">HEALTHY</span><p class="details">Free 9.94 GB of 9.98 GB; warning at 85%</p></section>
+<section class="card"><h2>Server Uptime</h2><div class="value">0d 2h</div><span class="status HEALTHY">HEALTHY</span><p class="details">Last boot: 2026-11-14 15:40:15 (server local time)</p></section>
+<section class="card"><h2>System Events</h2><div class="value">0</div><span class="status HEALTHY">HEALTHY</span><p class="details">No matching System Critical/Error events in last 24 hours</p></section></div>
+<section class="table-panel"><h2>Critical Windows Services</h2>
+<table><thead><tr><th>Service</th><th>Current state</th><th>Assessment</th></tr></thead>
+<tbody><tr><td>NTDS</td><td>Running</td><td><span class="status HEALTHY">HEALTHY</span></td></tr>
+<tr><td>DNS</td><td>Running</td><td><span class="status HEALTHY">HEALTHY</span></td></tr>
+<tr><td>W3SVC</td><td>Running</td><td><span class="status HEALTHY">HEALTHY</span></td></tr></tbody></table></section>
+<p class="footnote">Collection duration: 15.6 seconds. Source: local Windows performance counters, CIM and event logs. CPU is sampled; RAM, disks and services are snapshots. System events require technician interpretation. This report does not monitor ESXi or verify external time synchronization.</p>
+</main>
+</body>
+</html>

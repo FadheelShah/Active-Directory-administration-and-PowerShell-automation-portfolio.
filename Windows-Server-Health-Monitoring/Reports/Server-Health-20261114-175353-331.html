@@ -1,0 +1,29 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Windows Server Health Report</title>
+<style>
+body { font-family: Segoe UI, Arial, sans-serif; background: #f3f6fa; color: #172338; margin: 0; padding: 30px; }
+main { max-width: 850px; margin: auto; }
+h1 { margin-bottom: 8px; }
+.meta { color: #526276; margin-bottom: 25px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.card { background: white; padding: 22px; border-radius: 12px; border: 1px solid #dce3eb; }
+.value { font-size: 32px; font-weight: bold; margin: 10px 0; }
+.HEALTHY { color: #177245; font-weight: bold; }
+.WARNING { color: #ad6200; font-weight: bold; }
+.small { color: #526276; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body><main>
+<h1>Windows Server Health Report</h1>
+<div class="meta">Server: WIN-0691ML0QM2Q | Generated: 2026-11-14 17:53:53 (Fiji UTC+12)</div>
+<div class="card"><strong>Overall status:</strong> <span class="HEALTHY">HEALTHY</span></div>
+<br>
+<div class="grid">
+<div class="card"><h2>CPU</h2><div class="value">0%</div><div class="HEALTHY">HEALTHY</div><p>Maximum sampled: 0%</p><p class="small">6 samples across approximately 25 seconds; warning at 85% average usage.</p></div>
+<div class="card"><h2>Memory</h2><div class="value">49.6%</div><div class="HEALTHY">HEALTHY</div><p>Used: 1.98 GB / 4 GB</p><p>Available: 2.02 GB</p><p class="small">Warning at 85% usage.</p></div>
+</div>
+<p class="small">Source: local Windows CIM/WMI measurements. CPU values are processor load estimates, not Task Manager screenshots. Memory is a snapshot. This report does not assess ESXi hosts or establish historical trends.</p>
+</main></body></html>
