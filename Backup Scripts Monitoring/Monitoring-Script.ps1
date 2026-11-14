@@ -6,6 +6,10 @@
 # Environment: Windows Server 2022 / PowerShell 5.1
 # ============================================================
 
+param(
+    [switch]$NoBrowser
+)
+
 # ------------------------------------------------------------
 # 1. Configuration
 # ------------------------------------------------------------
@@ -41,7 +45,7 @@ $Timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
 $ReportPath = Join-Path $ReportsFolder "Backup-Report-$Timestamp.html"
 
 # Open the generated report in the default browser.
-$OpenReport = $true
+$OpenReport = -Not $NoBrowser
 
 # ------------------------------------------------------------
 # 2. Retrieve the latest backup completion event
@@ -55,6 +59,9 @@ $OpenReport = $true
 # the backup job specified above.
 #
 # Select-Object -First 1 returns the newest matching event.
+
+$LatestBackup = $null
+$EventLogReadFailed = $false
 
 try {
 
@@ -70,14 +77,16 @@ try {
 }
 catch {
 
-    # If Windows cannot read the event log,
-    # display the error and stop the script.
-    Write-Host "ERROR: Unable to read Veeam Event Log."
+    $EventLogReadFailed = $true
+
+    Write-Host "ERROR: Unable to read Veeam Event Log." `
+        -ForegroundColor Red
+
     Write-Host $_.Exception.Message
 
-    exit 1
+    # Continue so monitoring can report UNKNOWN.
+    $LatestBackup = $null
 }
-
 
 # ------------------------------------------------------------
 # 3. Check whether a backup completion event exists
@@ -89,9 +98,11 @@ catch {
 
 if ($null -eq $LatestBackup) {
 
-    Write-Host "WARNING: No completed backup found for $JobName"
+    Write-Host "WARNING: No completed backup found for $JobName" `
+        -ForegroundColor Yellow
 
-    exit 1
+    $BackupStatus = "UNKNOWN"
+    $OverallStatus = "UNKNOWN"
 }
 
 
@@ -101,13 +112,46 @@ if ($null -eq $LatestBackup) {
 
 # Search Veeam completion events for our specific job.
 # Only events reporting "Success" qualify.
+$LastSuccessfulBackup = $null
 
-$LastSuccessfulBackup = Get-WinEvent -FilterHashtable @{
-    LogName = $LogName
-    Id      = $CompletionEventID
-} | Where-Object {
-    $_.Message -like "*Veeam Agent '$JobName' finished with Success*"
-} | Select-Object -First 1
+if (-not $EventLogReadFailed) {
+
+    try {
+
+        $LastSuccessfulBackup = Get-WinEvent -FilterHashtable @{
+            LogName = $LogName
+            Id      = $CompletionEventID
+        } -ErrorAction Stop |
+        Where-Object {
+            $_.Message -like "*Veeam Agent '$JobName' finished with Success*"
+        } |
+        Select-Object -First 1
+
+    }
+    catch {
+
+    if ($_.FullyQualifiedErrorId -like "NoMatchingEventsFound*") {
+
+        Write-Host "WARNING: No Veeam completion events found." `
+            -ForegroundColor Yellow
+
+    }
+    else {
+
+        $EventLogReadFailed = $true
+
+        Write-Host "ERROR: Unable to retrieve the last successful backup." `
+            -ForegroundColor Red
+
+        Write-Host $_.Exception.Message
+    }
+
+    $LastSuccessfulBackup = $null
+        }
+    
+    
+    }
+
 
 # Check whether a successful backup was found.
 if ($null -eq $LastSuccessfulBackup) {
@@ -135,10 +179,12 @@ Write-Host "Event ID : $($LatestBackup.Id)"
 # 5. Determine the backup result
 # ------------------------------------------------------------
 
-# Inspect the message associated with the latest
-# completion event to identify the backup result.
+if ($null -eq $LatestBackup) {
 
-if ($LatestBackup.Message -match "finished with Success") {
+    Write-Host "Status   : UNKNOWN" -ForegroundColor Yellow
+
+}
+elseif ($LatestBackup.Message -match "finished with Success") {
 
     Write-Host "Status   : SUCCESS" -ForegroundColor Green
 
@@ -148,14 +194,10 @@ elseif ($LatestBackup.Message -match "finished with Warning") {
     Write-Host "Status   : WARNING" -ForegroundColor Yellow
 
 }
-
 elseif ($LatestBackup.Message -match "finished with Failed") {
 
-    # Display the failed backup status.
     Write-Host "Status   : FAILED" -ForegroundColor Red
 
-    # Extract the failure reason from the event message.
-    # Veeam includes additional details after "Error:".
     if ($LatestBackup.Message -match "Error:\s*(.+)") {
 
         $FailureReason = $Matches[1].Trim()
@@ -165,22 +207,16 @@ elseif ($LatestBackup.Message -match "finished with Failed") {
     }
     else {
 
-        # Some failed events might not include an
-        # explicit error description.
         Write-Host "Reason   : No detailed error provided"
 
     }
 
 }
-
 else {
 
-    # An unexpected message should not be treated
-    # as a successful backup.
     Write-Host "Status   : UNKNOWN" -ForegroundColor Yellow
 
 }
-
 
 
 # ------------------------------------------------------------
@@ -229,35 +265,50 @@ else {
 }
 
 
-
 # ------------------------------------------------------------
 # 7. Determine overall backup health
 # ------------------------------------------------------------
 
-# Start by assuming the backup is unhealthy.
-# We will only mark it healthy if all checks pass.
-$OverallStatus = "UNHEALTHY"
+$OverallStatus = "UNKNOWN"
 
-# Check whether the latest completed backup succeeded.
-$LatestJobSucceeded = $LatestBackup.Message -match "finished with Success"
-
-# Check whether a successful backup exists and is recent.
+$LatestJobSucceeded = $false
 $SuccessfulBackupIsCurrent = $false
 
+# Check the latest completed backup.
+if ($null -ne $LatestBackup) {
+
+    if ($LatestBackup.Message -match "finished with Success") {
+        $LatestJobSucceeded = $true
+    }
+
+    # A known failed, warning, or stale backup is unhealthy.
+    $OverallStatus = "UNHEALTHY"
+}
+
+# Check whether a successful backup is recent.
 if ($null -ne $LastSuccessfulBackup) {
 
-    # Calculate the age of the last successful backup.
-    $SuccessfulBackupAge = (Get-Date) - $LastSuccessfulBackup.TimeCreated
+    $SuccessfulBackupAge = (Get-Date) -
+        $LastSuccessfulBackup.TimeCreated
 
-    if ($SuccessfulBackupAge.TotalHours -le $MaxBackupAgeHours) {
+    if ($SuccessfulBackupAge.TotalHours -ge 0 -and
+        $SuccessfulBackupAge.TotalHours -le $MaxBackupAgeHours) {
+
         $SuccessfulBackupIsCurrent = $true
     }
 }
 
-# Both conditions must be true for a healthy result.
-if ($LatestJobSucceeded -and $SuccessfulBackupIsCurrent) {
+# Healthy only when both conditions are satisfied
+# and the event log was read successfully.
+if ($EventLogReadFailed) {
+
+    $OverallStatus = "UNKNOWN"
+
+}
+elseif ($LatestJobSucceeded -and $SuccessfulBackupIsCurrent) {
 
     $OverallStatus = "HEALTHY"
+
 }
 
 # ------------------------------------------------------------
@@ -266,21 +317,25 @@ if ($LatestJobSucceeded -and $SuccessfulBackupIsCurrent) {
 
 Write-Host "----------------------------------------"
 
-if ($OverallStatus -eq "HEALTHY") {
+switch ($OverallStatus) {
 
-    Write-Host "Overall Status : HEALTHY" -ForegroundColor Green
-    $ExitCode = 0
+    "HEALTHY" {
+        Write-Host "Overall Status : HEALTHY" -ForegroundColor Green
+        $ExitCode = 0
+    }
 
-}
-else {
+    "UNHEALTHY" {
+        Write-Host "Overall Status : UNHEALTHY" -ForegroundColor Red
+        $ExitCode = 1
+    }
 
-    Write-Host "Overall Status : UNHEALTHY" -ForegroundColor Red
-    $ExitCode = 1
-
+    default {
+        Write-Host "Overall Status : UNKNOWN" -ForegroundColor Yellow
+        $ExitCode = 2
+    }
 }
 
 Write-Host "========================================"
-
 # Return an exit code to the calling process.
 # Task Scheduler can use this to identify the result.
 
@@ -303,17 +358,21 @@ function ConvertTo-HtmlSafe {
 # ------------------------------------------------------------
 
 # Get the latest backup status from the event message.
-if ($LatestBackup.Message -match "finished with Success") {
-    $BackupStatus = "SUCCESS"
-}
-elseif ($LatestBackup.Message -match "finished with Failed") {
-    $BackupStatus = "FAILED"
-}
-elseif ($LatestBackup.Message -match "finished with Warning") {
-    $BackupStatus = "WARNING"
-}
-else {
-    $BackupStatus = "UNKNOWN"
+# Determine the latest backup result safely.
+$BackupStatus = "UNKNOWN"
+
+if ($null -ne $LatestBackup) {
+
+    if ($LatestBackup.Message -match "finished with Success") {
+        $BackupStatus = "SUCCESS"
+    }
+    elseif ($LatestBackup.Message -match "finished with Failed") {
+        $BackupStatus = "FAILED"
+    }
+    elseif ($LatestBackup.Message -match "finished with Warning") {
+        $BackupStatus = "WARNING"
+    }
+
 }
 
 # Default values when no successful backup exists.
@@ -387,174 +446,46 @@ $SafeLastSuccess = ConvertTo-HtmlSafe $LastSuccessText
 $GeneratedAt = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 # ------------------------------------------------------------
-# Build the HTML document
+# Load the external HTML template
 # ------------------------------------------------------------
 
-# A here-string allows us to write multiline HTML.
-# PowerShell replaces variables inside a double-quoted
-# here-string with their values.
+$TemplatePath = Join-Path $PSScriptRoot "Templates\Backup-Report.html"
 
-$HtmlReport = @"
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+if (-not (Test-Path -LiteralPath $TemplatePath -PathType Leaf)) {
+    throw "HTML template not found: $TemplatePath"
+}
 
-    <title>Veeam Backup Monitor</title>
+$HtmlReport = [System.IO.File]::ReadAllText($TemplatePath)
 
-    <style>
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f3f5f9;
-            color: #1e293b;
-            margin: 0;
-            padding: 40px 20px;
-        }
+# Replace template placeholders with monitoring values.
+$LatestBackupTimeText = "Not found"
 
-        .container {
-            max-width: 850px;
-            margin: auto;
-        }
+if ($null -ne $LatestBackup) {
+    $LatestBackupTimeText = $LatestBackup.TimeCreated.ToString(
+        "yyyy-MM-dd HH:mm:ss"
+    )
+}
 
-        .header {
-            margin-bottom: 25px;
-        }
+$Tokens = @{
+    '{{JOB_NAME}}'           = $SafeJobName
+    '{{OVERALL_STATUS}}'     = $OverallStatus
+    '{{OVERALL_CLASS}}'      = $OverallClass
+    '{{BACKUP_STATUS}}'      = $BackupStatus
+    '{{BACKUP_CLASS}}'       = $BackupClass
+    '{{FRESHNESS_STATUS}}'   = $FreshnessStatus
+    '{{FRESHNESS_CLASS}}'    = $FreshnessClass
+    '{{LAST_SUCCESS}}'       = $SafeLastSuccess
+    '{{BACKUP_AGE}}'         = $BackupAgeText
+    '{{LATEST_BACKUP_TIME}}' = ConvertTo-HtmlSafe $LatestBackupTimeText
+    '{{FAILURE_REASON}}'     = $SafeFailureReason
+    '{{GENERATED_AT}}'       = $GeneratedAt
+}
 
-        .header h1 {
-            margin-bottom: 5px;
-        }
+foreach ($Token in $Tokens.Keys) {
+    $HtmlReport = $HtmlReport.Replace($Token, [string]$Tokens[$Token])
+}
 
-        .subtitle {
-            color: #64748b;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.06);
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-
-        .label {
-            color: #64748b;
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-
-        .value {
-            font-size: 20px;
-            font-weight: 600;
-            overflow-wrap: anywhere;
-        }
-
-        .success {
-            color: #15803d;
-        }
-
-        .danger {
-            color: #dc2626;
-        }
-
-        .warning {
-            color: #b45309;
-        }
-
-        .footer {
-            color: #64748b;
-            font-size: 13px;
-            text-align: center;
-            margin-top: 25px;
-        }
-
-        @media (max-width: 600px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div class="container">
-
-        <div class="header">
-            <h1>Veeam Backup Monitor</h1>
-            <div class="subtitle">
-                PowerShell Backup Health Report
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="label">Backup Job</div>
-            <div class="value">$SafeJobName</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Overall Backup Health</div>
-            <div class="value $OverallClass">
-                $OverallStatus
-            </div>
-        </div>
-
-        <div class="grid">
-
-            <div class="card">
-                <div class="label">Latest Backup Result</div>
-                <div class="value $BackupClass">
-                    $BackupStatus
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="label">Backup Freshness</div>
-                <div class="value $FreshnessClass">
-                    $FreshnessStatus
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="label">Last Successful Backup</div>
-                <div class="value">$SafeLastSuccess</div>
-            </div>
-
-            <div class="card">
-                <div class="label">Backup Age</div>
-                <div class="value">$BackupAgeText</div>
-            </div>
-
-        </div>
-
-        <div class="card">
-            <div class="label">Latest Backup Time</div>
-            <div class="value">$($LatestBackup.TimeCreated)</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Failure Details</div>
-            <div class="value">$SafeFailureReason</div>
-        </div>
-
-        <div class="footer">
-            Report generated: $GeneratedAt
-            <p>Windows Server 2022 | Veeam Agent | PowerShell</p>
-        </div>
-
-    </div>
-</body>
-</html>
-"@
-
-# ------------------------------------------------------------
-# Save the HTML file
-# ------------------------------------------------------------
+$HtmlReportSaved = $false
 
 try {
 
@@ -563,8 +494,11 @@ try {
                            -Encoding UTF8 `
                            -ErrorAction Stop
 
+        $HtmlReportSaved = $true
+
     Write-Host "HTML report saved to: $ReportPath" `
         -ForegroundColor Green
+
 
 }
 catch {
@@ -574,14 +508,115 @@ catch {
 
     Write-Host $_.Exception.Message
 
-    exit 2
+    $HtmlReportSaved = $false
+    $ExitCode = 2
 }
 
 # ------------------------------------------------------------
 # Open the report in the default browser
 # ------------------------------------------------------------
 
-if ($OpenReport) {
+# ------------------------------------------------------------
+# Structured data for the Unified Monitoring Dashboard
+# ------------------------------------------------------------
+
+$CollectedAtUtc = [DateTime]::UtcNow.ToString('o')
+
+$LatestBackupTimeUtc = $null
+$LastSuccessTimeUtc = $null
+$BackupAgeHoursJson = $null
+
+if ($null -ne $LatestBackup) {
+    $LatestBackupTimeUtc = $LatestBackup.TimeCreated.ToUniversalTime().ToString('o')
+}
+
+if ($null -ne $LastSuccessfulBackup) {
+    $LastSuccessTimeUtc = $LastSuccessfulBackup.TimeCreated.ToUniversalTime().ToString('o')
+    $BackupAgeHoursJson = [math]::Round(
+        ((Get-Date) - $LastSuccessfulBackup.TimeCreated).TotalHours, 2
+    )
+}
+
+$BackupData = [PSCustomObject]@{
+    SchemaVersion        = 1
+    Hostname             = $env:COMPUTERNAME
+    CollectedAtUtc       = $CollectedAtUtc
+    JobName              = $JobName
+    OverallStatus        = $OverallStatus
+    BackupStatus         = $BackupStatus
+    FreshnessStatus      = $FreshnessStatus
+    LatestBackupTimeUtc  = $LatestBackupTimeUtc
+    LastSuccessTimeUtc   = $LastSuccessTimeUtc
+    BackupAgeHours       = $BackupAgeHoursJson
+    MaxBackupAgeHours    = $MaxBackupAgeHours
+    FailureReason        = $FailureReason
+}
+
+# ------------------------------------------------------------
+# Export JSON for the Unified Monitoring Dashboard
+# ------------------------------------------------------------
+
+$DataFolder = Join-Path $PSScriptRoot 'Data'
+$HistoryFolder = Join-Path $DataFolder 'History'
+
+foreach ($Folder in @($DataFolder, $HistoryFolder)) {
+    if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
+        New-Item -ItemType Directory -Path $Folder -Force | Out-Null
+    }
+}
+
+# Convert backup monitoring data into JSON.
+$Json = $BackupData | ConvertTo-Json -Depth 5
+
+$Utf8 = New-Object System.Text.UTF8Encoding($false)
+
+# Save a historical record of this monitoring run.
+$HistoryFile = "Backup-Report-$Timestamp.json"
+$HistoryPath = Join-Path $HistoryFolder $HistoryFile
+
+[System.IO.File]::WriteAllText($HistoryPath, $Json, $Utf8)
+
+# Update latest.json using a temporary file.
+$LatestPath = Join-Path $DataFolder 'latest.json'
+
+$TempPath = Join-Path $DataFolder (
+    'latest-{0}.tmp' -f [guid]::NewGuid().ToString('N')
+)
+
+$BackupPath = Join-Path $DataFolder (
+    'latest-backup-{0}.tmp' -f [guid]::NewGuid().ToString('N')
+)
+
+try {
+    [System.IO.File]::WriteAllText($TempPath, $Json, $Utf8)
+
+    if (Test-Path -LiteralPath $LatestPath -PathType Leaf) {
+        [System.IO.File]::Replace(
+            $TempPath,
+            $LatestPath,
+            $BackupPath
+        )
+    }
+    else {
+        [System.IO.File]::Move($TempPath, $LatestPath)
+    }
+
+    Write-Host "JSON data saved to: $LatestPath"
+    Write-Host "JSON history saved to: $HistoryPath"
+}
+finally {
+    foreach ($Path in @($TempPath, $BackupPath)) {
+        if (Test-Path -LiteralPath $Path) {
+            Remove-Item -LiteralPath $Path -Force
+        }
+    }
+}
+
+# ------------------------------------------------------------
+# Save the HTML file
+# ------------------------------------------------------------
+
+if ($OpenReport -and $HtmlReportSaved) {
 
     # Start-Process opens the local HTML file using
     # the default application associated with .html.
