@@ -27,8 +27,18 @@ $MaxBackupAgeHours = 24
 # HTML report configuration
 # ------------------------------------------------------------
 
-# Save the HTML report in the same folder as this script.
-$ReportPath = Join-Path $PSScriptRoot "Backup-Report.html"
+# Create the Reports folder if it doesn't exist
+$ReportsFolder = Join-Path $PSScriptRoot "Reports"
+
+if (-not (Test-Path $ReportsFolder)) {
+    New-Item -Path $ReportsFolder -ItemType Directory -Force | Out-Null
+}
+
+# Generate a unique timestamp for each report
+$Timestamp = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
+
+# Save the HTML report inside the Reports folder
+$ReportPath = Join-Path $ReportsFolder "Backup-Report-$Timestamp.html"
 
 # Open the generated report in the default browser.
 $OpenReport = $true

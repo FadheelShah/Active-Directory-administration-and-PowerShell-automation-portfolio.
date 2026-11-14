@@ -227,7 +227,7 @@ $html = [System.IO.File]::ReadAllText($templatePath)
 foreach ($token in $tokens.Keys) { $html = $html.Replace($token,[string]$tokens[$token]) }
 
 # Store each run as a timestamped HTML evidence file; do not overwrite old reports.
-$reportFile = 'Server-Health-{0}.html' -f $fijiFinished.ToString('yyyyMMdd-HHmmss-fff')
+$reportFile = 'Server-Health-{0}.html' -f $fijiFinished.ToString('yyyy-MM-dd-HH-mm-ss')
 $reportPath = Join-Path $reportsPath $reportFile
 [System.IO.File]::WriteAllText($reportPath,$html,[System.Text.UTF8Encoding]::new($false))
 Write-Host ('Overall: {0} | CPU: {1} | Memory: {2}' -f $overallStatus,$cpuText,$memText)
