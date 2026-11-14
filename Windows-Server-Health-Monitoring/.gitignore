@@ -1,0 +1,6 @@
+# Ignore generated HTML health reports
+Reports/
+
+# Ignore temporary PowerShell files
+*.ps1.bak
+*.tmp
