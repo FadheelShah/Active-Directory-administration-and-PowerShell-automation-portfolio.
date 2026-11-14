@@ -2,7 +2,15 @@
 ProvisioningAuditLog.csv
 
 # Temporary files
+# Generated monitoring reports
+**/Reports/
+
+# Generated dashboard monitoring data
+**/Data/
+
+# Temporary files
 *.tmp
+
 *.log
 
 # PowerShell history
